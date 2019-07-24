@@ -1,0 +1,16 @@
+{
+  "name": "cam2",
+  "profile": "mine",
+  "stages": {
+    "staging": {
+      "domain": "cam2.prazefarm.co.uk",
+      "zone": "prazefarm.co.uk"
+    }
+  },
+  "regions": [
+    "ap-southeast-1"
+  ],
+  "error_pages": {
+    "disable": true
+  }
+}

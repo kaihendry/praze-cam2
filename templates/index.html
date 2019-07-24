@@ -1,0 +1,10 @@
+<html>
+<h1>{{ len .Listing }} videos</h1>
+<ul>
+{{ range .Listing }}
+<!-- <li><a href="https://s3-eu-west-1.amazonaws.com/c.prazefarm.co.uk/{{ .FilePath }}"> -->
+<li><a href="{{ .URL }}">
+{{ .FilePath }}</li>
+{{ end }}
+</ul>
+</html>

@@ -1,0 +1,6 @@
+[Unit]
+Description=Camera snapshot
+
+[Service]
+User=pi
+ExecStart=/usr/bin/rclone move --s3-acl public-read --delete-empty-src-dirs /home/pi/cam s3://c.prazefarm.co.uk

@@ -1,0 +1,9 @@
+[Unit]
+Description=Re-encode
+
+[Service]
+User=pi
+ExecStart=/home/pi/move.sh
+
+[Install]
+WantedBy=multi-user.target

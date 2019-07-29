@@ -3,8 +3,8 @@
   "profile": "mine",
   "stages": {
     "staging": {
-      "domain": "cam2.prazefarm.co.uk",
-      "zone": "prazefarm.co.uk"
+      "domain": "cam2.dabase.com",
+      "zone": "dabase.com"
     }
   },
   "regions": [
@@ -12,5 +12,18 @@
   ],
   "error_pages": {
     "disable": true
+  },
+  "lambda": {
+    "policy": [
+      {
+        "Effect": "Allow",
+        "Action": [
+          "s3:*"
+        ],
+        "Resource": [
+          "arn:aws:s3:::c.prazefarm.co.uk/*"
+        ]
+      }
+    ]
   }
 }

@@ -19,13 +19,62 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+	"github.com/justinas/alice"
 )
 
-type YoutubeBackup struct {
-	FilePath string
-}
+type ctxKey string
+
+var logKey ctxKey = "logWithRequestID"
+
+const sessionName = "cam2"
+
+var sessionKey ctxKey = sessionName
+var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_SECRET")), nil)
 
 var views = template.Must(template.ParseGlob("templates/*.html"))
+
+func loggingMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logs := log.WithFields(log.Fields{
+			"requestID": r.Header.Get("X-Request-Id"),
+		})
+		r = r.WithContext(context.WithValue(r.Context(), logKey, logs))
+		h.ServeHTTP(w, r)
+	})
+}
+
+func requireLogin(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, sessionName)
+		if err != nil || session.Values["ID"] == nil {
+			if err := allowed(r); err != nil {
+				log.WithError(err).Info("not allowed")
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+			session, err := store.Get(r, sessionName)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			store.Options.HttpOnly = true
+			if os.Getenv("UP_STAGE") != "" {
+				log.Info("setting secure cookie")
+				store.Options.Secure = true
+			}
+			session.Values["ID"] = r.Header.Get("X-Forwarded-For")
+			err = session.Save(r, w)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			log.Infof("seen before, existing session", session)
+		}
+		h.ServeHTTP(w, r)
+	})
+}
 
 func main() {
 
@@ -35,10 +84,12 @@ func main() {
 		log.SetHandler(json.Default)
 	}
 
+	authHandlers := alice.New(loggingMiddleware, requireLogin)
+
 	addr := ":" + os.Getenv("PORT")
 	app := mux.NewRouter()
 	app.HandleFunc("/", today)
-	app.HandleFunc("/v", showVideos)
+	app.Handle("/v", authHandlers.ThenFunc(showVideos))
 	if err := http.ListenAndServe(addr, app); err != nil {
 		log.WithError(err).Fatal("error listening")
 	}
@@ -54,6 +105,10 @@ func allowed(r *http.Request) error {
 	}
 
 	remoteAddr := strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]
+
+	if remoteAddr == "::1" {
+		return nil
+	}
 
 	whitelist := []string{
 		"81.187.180.129/26",
@@ -71,13 +126,8 @@ func allowed(r *http.Request) error {
 }
 
 func showVideos(w http.ResponseWriter, r *http.Request) {
-	if err := allowed(r); err != nil {
-		log.WithError(err).Info("not allowed")
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	log.WithField("remoteaddr", r.Header.Get("X-Forwarded-For")).Info("from")
+	logs := r.Context().Value(logKey).(*log.Entry)
+	logs.WithField("remoteaddr", r.Header.Get("X-Forwarded-For")).Info("from")
 	date := r.FormValue("date")
 	ctx := log.WithFields(log.Fields{
 		"date": date,
@@ -102,13 +152,13 @@ func showVideos(w http.ResponseWriter, r *http.Request) {
 		Prefix: aws.String(date),
 	})
 	p := s3.NewListObjectsPaginator(req)
-	var listing []YoutubeBackup
+	var listing []string
 	for p.Next(context.TODO()) {
 		page := p.CurrentPage()
 		for _, obj := range page.Contents {
 			ext := filepath.Ext(*obj.Key)
 			if ext == ".mp4" {
-				listing = append(listing, YoutubeBackup{FilePath: strings.TrimSuffix(*obj.Key, ext)})
+				listing = append(listing, strings.TrimSuffix(*obj.Key, ext))
 			}
 		}
 	}
@@ -119,7 +169,7 @@ func showVideos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = views.ExecuteTemplate(w, "index.html", struct {
-		Listing []YoutubeBackup
+		Listing []string
 	}{
 		listing,
 	})

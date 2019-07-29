@@ -15,8 +15,8 @@
 <body>
 {{ range .Listing }}
 <p><video preload="none" controls
-	poster="https://s3-eu-west-1.amazonaws.com/c.prazefarm.co.uk/{{ .FilePath }}.jpg"
-	src="https://s3-eu-west-1.amazonaws.com/c.prazefarm.co.uk/{{ .FilePath }}.mp4">
+	poster="https://s3-eu-west-1.amazonaws.com/c.prazefarm.co.uk/{{ . }}.jpg"
+	src="https://s3-eu-west-1.amazonaws.com/c.prazefarm.co.uk/{{ . }}.mp4">
 </video></p>
 {{- end }}
 </body>

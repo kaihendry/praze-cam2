@@ -53,11 +53,7 @@ func requireLogin(h http.Handler) http.Handler {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
-			session, err := store.Get(r, sessionName)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+			session, _ := store.Get(r, sessionName)
 			store.Options.HttpOnly = true
 			if os.Getenv("UP_STAGE") != "" {
 				log.Info("setting secure cookie")

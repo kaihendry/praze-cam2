@@ -34,16 +34,6 @@ var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_SECRET")), nil)
 
 var views = template.Must(template.ParseGlob("templates/*.html"))
 
-func loggingMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logs := log.WithFields(log.Fields{
-			"requestID": r.Header.Get("X-Request-Id"),
-		})
-		r = r.WithContext(context.WithValue(r.Context(), logKey, logs))
-		h.ServeHTTP(w, r)
-	})
-}
-
 func requireLogin(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, sessionName)
@@ -80,7 +70,7 @@ func main() {
 		log.SetHandler(json.Default)
 	}
 
-	authHandlers := alice.New(loggingMiddleware, requireLogin)
+	authHandlers := alice.New(requireLogin)
 
 	addr := ":" + os.Getenv("PORT")
 	app := mux.NewRouter()
@@ -122,7 +112,7 @@ func allowed(r *http.Request) error {
 }
 
 func showVideos(w http.ResponseWriter, r *http.Request) {
-	logs := r.Context().Value(logKey).(*log.Entry)
+	logs := logs.logContext(r)
 	logs.WithField("remoteaddr", r.Header.Get("X-Forwarded-For")).Info("from")
 	date := r.FormValue("date")
 	ctx := log.WithFields(log.Fields{
